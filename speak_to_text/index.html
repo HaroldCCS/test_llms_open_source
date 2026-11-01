@@ -7,11 +7,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-6">
-  <div class="max-w-xl w-full bg-slate-800 rounded-2xl shadow-xl border border-slate-700 p-8">
+  <div class="max-w-2xl w-full bg-slate-800 rounded-2xl shadow-xl border border-slate-700 p-8">
     <h1 class="text-2xl font-bold mb-2 text-emerald-400">Transcripción de Audio (WhatsApp)</h1>
     <p class="text-slate-400 text-sm mb-6">Arrastra un audio (.opus, .ogg, .mp3, .wav) o selecciónalo para transcribirlo localmente.</p>
 
-    <!-- Zona de arrastre -->
+    <!-- Drop Zone -->
     <div id="drop-zone" class="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-emerald-500 transition cursor-pointer mb-6">
       <svg class="w-12 h-12 mx-auto text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
@@ -26,8 +26,8 @@
 
     <!-- Resultado -->
     <div class="mt-6">
-      <label class="block text-sm font-medium text-slate-400 mb-2">Texto Extraído:</label>
-      <div id="result" class="bg-slate-950 p-4 rounded-xl min-h-[120px] text-slate-200 border border-slate-800 whitespace-pre-wrap font-mono text-sm">
+      <label class="block text-sm font-medium text-slate-400 mb-2">Mensaje Pulido / Requerimientos:</label>
+      <div id="result" class="bg-slate-950 p-4 rounded-xl min-h-[140px] text-slate-200 border border-slate-800 whitespace-pre-wrap font-sans text-sm leading-relaxed">
         Esperando audio...
       </div>
     </div>
@@ -65,7 +65,7 @@
 
       btnTranscribe.disabled = true;
       btnTranscribe.textContent = 'Procesando...';
-      resultDiv.textContent = 'Convirtiendo y transcribiendo audio...';
+      resultDiv.textContent = 'Transcribiendo audio y sintetizando con Qwen...';
 
       const formData = new FormData();
       formData.append('audio', selectedFile);
@@ -74,10 +74,14 @@
         const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
         const data = await response.json();
 
-        if (data.text) {
-          resultDiv.textContent = data.text;
+        if (data.cleanText) {
+          resultDiv.textContent = data.cleanText;
+        } else if (data.rawText) {
+          resultDiv.textContent = data.rawText;
+        } else if (data.error) {
+          resultDiv.textContent = 'Error: ' + data.error;
         } else {
-          resultDiv.textContent = 'Error: ' + (data.error || 'No se pudo obtener el texto.');
+          resultDiv.textContent = 'Error: No se obtuvo respuesta.';
         }
       } catch (err) {
         resultDiv.textContent = 'Error de conexión con el servidor.';
