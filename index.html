@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen2.5-VL OCR Extractor</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Marked.js para formatear Markdown del modelo -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#090d16',
+                        darkCard: '#111827',
+                        accentBlue: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos personalizados para scrollbar y animación de arrastrar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.08) !important;
+        }
+    </style>
+</head>
+<body class="bg-darkBg text-gray-100 min-h-screen flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
+
+    <!-- Header superior -->
+    <header class="border-b border-gray-800 bg-darkCard/80 backdrop-blur px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-blue-600/20 rounded-lg text-blue-400 border border-blue-500/30">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-lg font-semibold tracking-wide text-white">Qwen2.5-VL Vision OCR</h1>
+                <p class="text-xs text-gray-400">Inferencia local directa con Ollama (<span class="font-mono text-blue-400">http://localhost:11434</span>)</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <label for="modelSelect" class="text-xs text-gray-400">Modelo:</label>
+            <input type="text" id="modelSelect" value="qwen2.5vl:7b" class="bg-gray-900 border border-gray-700 text-xs text-blue-400 rounded-md px-3 py-1.5 font-mono focus:outline-none focus:border-blue-500 w-36">
+        </div>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl w-full mx-auto">
+        
+        <!-- Panel Izquierdo: Arrastrar Imagen / Previsualización -->
+        <section class="flex flex-col space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-medium text-gray-300 uppercase tracking-wider">1. Imagen de entrada</h2>
+                <button id="clearBtn" class="hidden text-xs text-gray-400 hover:text-red-400 transition-colors">Limpiar imagen</button>
+            </div>
+
+            <!-- Dropzone para arrastrar o hacer clic -->
+            <div id="dropzone" class="flex-1 min-h-[350px] border-2 border-dashed border-gray-700 hover:border-gray-500 rounded-xl bg-darkCard/50 flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-200 relative group overflow-hidden">
+                <input type="file" id="fileInput" accept="image/*" class="hidden">
+                
+                <!-- Vista por defecto -->
+                <div id="dropzoneText" class="flex flex-col items-center space-y-3">
+                    <div class="p-4 bg-gray-800/80 rounded-full text-gray-400 group-hover:text-blue-400 group-hover:bg-blue-900/20 transition-all">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-200">Arrastra tu imagen aquí</p>
+                        <p class="text-xs text-gray-500 mt-1">o haz clic para seleccionar (PNG, JPG, WEBP)</p>
+                    </div>
+                </div>
+
+                <!-- Previsualización de la Imagen -->
+                <img id="imagePreview" class="hidden max-h-[500px] w-auto object-contain rounded-lg shadow-lg" alt="Previsualización">
+            </div>
+
+            <!-- Controles de Prompt -->
+            <div class="space-y-2">
+                <label for="promptInput" class="text-xs text-gray-400">Instrucción / Prompt:</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="promptInput" value="Extrae todo el texto y datos clave de esta imagen. Si hay tablas o datos estructurados, formatealos limpiamente en Markdown o JSON." class="flex-1 bg-darkCard border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500">
+                    <button id="processBtn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white font-medium px-5 py-2 rounded-lg text-sm transition-all flex items-center space-x-2">
+                        <span>Procesar</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Panel Derecho: Salida en tiempo real (Streaming Output) -->
+        <section class="flex flex-col space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-medium text-gray-300 uppercase tracking-wider">2. Resultado del OCR</h2>
+                <div class="flex items-center space-x-3 text-xs text-gray-400 font-mono">
+                    <span id="statusBadge" class="px-2 py-0.5 rounded bg-gray-800 text-gray-400">Esperando imagen</span>
+                    <span id="timer">0.0s</span>
+                </div>
+            </div>
+
+            <!-- Área de respuesta -->
+            <div class="flex-1 bg-darkCard border border-gray-800 rounded-xl p-5 overflow-auto max-h-[600px] flex flex-col justify-between font-mono text-sm leading-relaxed text-gray-300">
+                <div id="outputContent" class="prose prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-800">
+                    <p class="text-gray-600 italic">Carga una imagen y presiona "Procesar" para ver la extracción del modelo...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Elementos DOM
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const dropzoneText = document.getElementById('dropzoneText');
+        const processBtn = document.getElementById('processBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const promptInput = document.getElementById('promptInput');
+        const outputContent = document.getElementById('outputContent');
+        const statusBadge = document.getElementById('statusBadge');
+        const timer = document.getElementById('timer');
+        const modelSelect = document.getElementById('modelSelect');
+
+        let currentBase64Image = null;
+        let timerInterval = null;
+        let startTime = 0;
+
+        // --- Manejo de Drag and Drop ---
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('drag-over');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('drag-over');
+            });
+        });
+
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetState();
+        });
+
+        // --- Cargar e Inspeccionar Imagen ---
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Por favor, selecciona un archivo de imagen válido.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64Data = e.target.result.split(',')[1];
+                currentBase64Image = base64Data;
+                
+                imagePreview.src = e.target.result;
+                imagePreview.classList.remove('hidden');
+                dropzoneText.classList.add('hidden');
+                clearBtn.classList.remove('hidden');
+                processBtn.disabled = false;
+                
+                statusBadge.textContent = 'Imagen cargada';
+                statusBadge.className = 'px-2 py-0.5 rounded bg-blue-900/40 text-blue-400 border border-blue-800';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetState() {
+            currentBase64Image = null;
+            imagePreview.src = '';
+            imagePreview.classList.add('hidden');
+            dropzoneText.classList.remove('hidden');
+            clearBtn.classList.add('hidden');
+            processBtn.disabled = true;
+            fileInput.value = '';
+            outputContent.innerHTML = '<p class="text-gray-600 italic">Carga una imagen y presiona "Procesar" para ver la extracción del modelo...</p>';
+            statusBadge.textContent = 'Esperando imagen';
+            statusBadge.className = 'px-2 py-0.5 rounded bg-gray-800 text-gray-400';
+            timer.textContent = '0.0s';
+            clearInterval(timerInterval);
+        }
+
+        // --- Petición de Streaming a Ollama ---
+        processBtn.addEventListener('click', async () => {
+            if (!currentBase64Image) return;
+
+            // Preparar UI
+            processBtn.disabled = true;
+            outputContent.innerHTML = '';
+            statusBadge.textContent = 'Procesando (streaming)...';
+            statusBadge.className = 'px-2 py-0.5 rounded bg-yellow-900/40 text-yellow-400 border border-yellow-800';
+            
+            // Iniciar cronómetro
+            startTime = Date.now();
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                timer.textContent = `${elapsed}s`;
+            }, 100);
+
+            let rawMarkdown = '';
+
+            try {
+                const response = await fetch('http://localhost:11434/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelSelect.value.trim(),
+                        messages: [
+                            {
+                                role: 'user',
+                                content: promptInput.value.trim(),
+                                images: [currentBase64Image]
+                            }
+                        ],
+                        stream: true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error en el servidor de Ollama (Status: ${response.status})`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    // Ollama envía múltiples objetos JSON línea por línea
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                    for (const line of lines) {
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.message && parsed.message.content) {
+                                rawMarkdown += parsed.message.content;
+                                // Renderizar Markdown dinámicamente
+                                outputContent.innerHTML = marked.parse(rawMarkdown);
+                            }
+                        } catch (err) {
+                            console.error('Error parseando fragmento JSON:', err);
+                        }
+                    }
+                }
+
+                // Finalizado con éxito
+                statusBadge.textContent = 'Completado';
+                statusBadge.className = 'px-2 py-0.5 rounded bg-green-900/40 text-green-400 border border-green-800';
+
+            } catch (error) {
+                console.error('Error al consultar Ollama:', error);
+                outputContent.innerHTML = `
+                    <div class="p-4 bg-red-900/30 border border-red-800 text-red-300 rounded-lg">
+                        <p class="font-bold">Error de conexión:</p>
+                        <p class="text-xs mt-1">${error.message}</p>
+                        <p class="text-xs mt-2 text-gray-400">Verifica que Ollama esté corriendo en terminal con <code class="bg-black/50 px-1 rounded">ollama serve</code> y que tengas descargado el modelo (<code class="bg-black/50 px-1 rounded">ollama pull ${modelSelect.value.trim()}</code>).</p>
+                    </div>
+                `;
+                statusBadge.textContent = 'Error';
+                statusBadge.className = 'px-2 py-0.5 rounded bg-red-900/40 text-red-400 border border-red-800';
+            } finally {
+                clearInterval(timerInterval);
+                processBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
