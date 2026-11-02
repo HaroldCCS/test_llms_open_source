@@ -1,0 +1,5 @@
+node_modules
+.cache
+.env
+# Credenciales de la sesión de WhatsApp: dan acceso completo a la cuenta.
+auth_info

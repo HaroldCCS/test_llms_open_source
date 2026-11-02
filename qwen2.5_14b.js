@@ -47,7 +47,7 @@ rl.on('line', (prompt) => {
   messages.push({ role: 'user', content: trimmed });
 
   const data = JSON.stringify({
-    model: 'qwen2.5:14b',
+    model: 'qwen2.5:7b',
     messages: messages,
     stream: true
   });
